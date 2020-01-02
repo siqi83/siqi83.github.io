@@ -1,14 +1,15 @@
 ---
 layout: page
 title: About Me
-tags: [about, Jekyll, theme, moon]
-date: 2016-03-21
+tags: [about, Siqi, theme, moon]
+date: 2020-01-02
 comments: false
 ---
     
-<center> Master student</center>
+<center> MSBA student at UCSD </center>
 
-## Yilin
+## Siqi (Stella) Hu
+#### 
 
 
 
