@@ -1,14 +1,14 @@
 # Site
-title:              Yilin Yang
-bio:                'One shot, one opportunity'
-description:        "Yilin Yang's blog"
+title:              Siqi (Stella) Hu
+bio:                '?'
+description:        "Siqi Hu's blog"
 reading_time:       true
-words_per_minute:   200
+words_per_minute:   1000
 logo:               'assets/img/logo.png'
 background:         'assets/img/placeholder-big.jpg'
 tiled_bg:           false   # Set this true if you want to tile your background image, otherwise it will be covered
 locale:             en_US
-url:                https://yilinyang123.github.io
+url:                https://siqi83.github.io
 
 # Jekyll
 permalink:          /:title/
@@ -37,14 +37,14 @@ disqus_shortname:   taylantatli
   #ad-client:
   #ad-slot:
 #bing-verify:
-email: yilinyang0619@gmail.com
+email: sihu@ucsd.edu
 #twitter:            username
 #facebook:           username
-github-url:         yilinyang123
+github-url:         siqi83
 #stackoverflow:     123456/username   from a "http://stackoverflow.com/users/123456/username" link
-linkedin:          yilin-yang0619
+linkedin:          Siqi (Stella) HU
 #xing:              username
-instagram:          youngnmax
+instagram:          sss_kkk83
 #lastfm:            username
 #tumblr:            username
 #medium:            '@username'
