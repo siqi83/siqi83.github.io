@@ -1,8 +1,8 @@
 ---
-layout: project
+layout: post
 title:  "Recommender System & Rating Prediction of Amazon Digital Music"
 date:   2020-01-02
-excerpt: "hw2"
+excerpt: "A couple of models are built based on the similarities among items (Jaccard similarity-based model), the significant features of customers and items (latent factor models), and the laws in review texts (text-analysis based model)."
 tag:
 - jekyll 
 - moon
