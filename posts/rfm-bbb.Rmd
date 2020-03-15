@@ -1,0 +1,859 @@
+---
+pagetitle: Rmd report
+output:
+  html_document:
+    highlight: zenburn
+    theme: cosmo
+    df_print: paged
+    toc: yes
+    code_folding: hide
+    code_download: true
+---
+
+```{r r_setup, include = FALSE}
+## initial settings
+knitr::opts_chunk$set(
+  comment = NA,
+  echo = TRUE,
+  error = TRUE,
+  cache = FALSE,
+  message = FALSE,
+
+  dpi = 96,
+  warning = FALSE
+)
+
+## width to use when printing tables etc.
+options(
+  width = 250,
+  scipen = 100,
+  max.print = 5000,
+  stringsAsFactors = FALSE
+)
+
+## make all required libraries available by loading radiant package if needed
+if (is.null(shiny::getDefaultReactiveDomain())) library(radiant)
+```
+
+<style>
+.btn, .form-control, pre, code, pre code {
+  border-radius: 4px;
+}
+.table {
+  width: auto;
+}
+ul, ol {
+  padding-left: 18px;
+}
+code, pre, pre code {
+  overflow: auto;
+  white-space: pre;
+  word-wrap: normal;
+}
+code {
+  color: #c7254e;
+  background-color: #f9f2f4;
+}
+pre {
+  background-color: #ffffff;
+}
+</style>
+
+## RFM for Bookbinders
+
+Start by loading the `bbb.rds` data into Radiant using the _Data > Manage_ tab. Then press the report icon <i title='Report results' class='fa fa-edit'></i> icon on the bottom-left of the screen to add the relevant R-code to _Report > Rmd_.
+
+```{r}
+## load the original tibble from data/bbb.rds
+bbb_file <- tempfile()
+curl::curl_download(
+  "https://www.dropbox.com/s/i6athvk5m4t822m/bbb.rds?dl=1",
+  destfile = bbb_file
+)
+bbb <- readr::read_rds(bbb_file)
+```
+
+### Assessing recency
+
+Create a bar-plot using `buyer` as the Y-variable and `last` as the X-variable.
+
+```{r fig.width = 7, fig.height = 4.67}
+visualize(
+  bbb,
+  xvar = "last",
+  yvar = "buyer",
+  type = "bar",
+  labs = list(
+    y = "Proportion of buyers = 'yes'", 
+    x = "months since last purchase (last)"
+  ),
+  custom = FALSE
+)
+```
+
+Plot a histogram of the `last` variable (set plot type to "distribution") 
+
+```{r fig.width = 6.46, fig.height = 4.31, dpi = 288}
+visualize(bbb, xvar = "last", type = "dist", custom = FALSE)
+```
+
+Create the `recency` variable `rec_iq` using the following command in _Data > Transform > Create_:
+
+`rec_iq = xtile(last, 5)`
+
+```{r}
+## create recency quintiles
+bbb <- mutate(bbb, rec_iq = xtile(last, 5))
+```
+
+Is recency predictive of purchase? Are the best customers in quintile 1? The graph below shows this is indeed the case.
+
+```{r fig.width = 7, fig.height = 4.67}
+visualize(
+  bbb,
+  xvar = "rec_iq",
+  yvar = "buyer",
+  type = "bar",
+  labs = list(
+    y = "Proportion of buyers = 'yes'", 
+    x = "Recency quintiles (rec_iq)"
+  ),
+  custom = FALSE
+)
+```
+
+### Assessing frequency
+
+The plot below shows that purchase probability is NOT highest in the 1st quantile for frequency (`purch`).
+
+```{r fig.width = 7, fig.height = 4.67}
+visualize(
+  bbb,
+  xvar = "purch",
+  yvar = "buyer",
+  type = "bar",
+  labs = list(
+    y = "Proportion of buyers = 'yes'",
+    x = "Purchase frequency (purch)"
+  ),
+  custom = FALSE
+) 
+```
+
+This means we need to _flip_ the bin numbers so the highest purchase probability will bin in the 1st bin (quantile). The easiest way to do this is to add `rev = TRUE` in the call to `xtile`.
+
+`freq_iq = xtile(purch, 5, rev = TRUE)`
+
+Alternatively, you could use:
+
+`freq_iq = 6L - xtile(purch, 5)`
+
+```{r}
+## create frequency quintiles
+bbb <- mutate(bbb, freq_iq = xtile(purch, 5, rev = TRUE))
+```
+
+Is frequency predictive of purchase? Are the best customers in quintile 1? The graph below shows this is now indeed the case.
+
+```{r fig.width = 7, fig.height = 4.67}
+visualize(
+  bbb,
+  xvar = "freq_iq",
+  yvar = "buyer",
+  type = "bar",
+  labs = list(
+    y = "Proportion of buyers = 'yes'", 
+    x = "Frequency quintiles (freq_iq)"
+  ),
+  custom = FALSE
+)
+```
+
+Why are there only 4 values? Looking at the histogram below we see that the distribution of `purch` is heavily skewed (to the right). This makes it difficult for the binning algorithm to create 5 _bins_ of similar size
+
+```{r fig.width = 7, fig.height = 4.67}
+visualize(bbb, xvar = "purch", color = "freq_iq")
+```
+
+### Assessing monetary value
+
+The plot shows that purchase probability will NOT be highest in the 1st monetary quantile (`total`)
+
+```{r fig.width = 7, fig.height = 4.67}
+visualize(
+  bbb,
+  xvar = "total",
+  yvar = "buyer",
+  type = "bar",
+  labs = list(
+    y = "Proportion of buyers = 'yes'", 
+    x = "Monetary value (total)"
+  ), 
+  custom = TRUE
+) + 
+  theme(
+    axis.ticks.x = element_blank(), 
+    axis.text.x = element_blank()
+  )
+```
+
+Plot a histogram of the `total` variable
+
+```{r fig.width = 6.46, fig.height = 4.31, dpi = 288}
+visualize(bbb, xvar = "total", type = "dist", custom = FALSE)
+```
+
+Just like we did for `frequency`, we have to _flip_ the bins so the highest purchase probability is in the 1st quantile. The easiest way to do this is to add `rev = TRUE` in the call to `xtile`. 
+
+`mon_iq = xtile(total, 5, rev = TRUE)`
+
+```{r}
+## create monetary quintiles
+bbb <- mutate(bbb, mon_iq = xtile(total, 5, rev = TRUE))
+```
+
+Is monetary predictive of purchase? Are the best customers in quintile 1? The graph below shows this is now indeed the case.
+
+```{r fig.width = 7, fig.height = 4.67}
+visualize(
+  bbb,
+  xvar = "mon_iq",
+  yvar = "buyer",
+  type = "bar",
+  labs = list(
+    y = "Proportion of buyers = 'yes'", 
+    x = "Monetary value quantiles (mon_iq)"
+  ),
+  custom = FALSE
+)
+```
+
+## Correlation between RFM variables
+
+What is the correlation between `last`, `total`, and `purch`?
+
+```{r fig.width = 6.73, fig.height = 6.73}
+result <- correlation(bbb, vars = c("last", "total", "purch"))
+summary(result)
+plot(result, n = 1000)
+```
+
+Create a new variable that captures the average amount spent per purchase (`avg_total`).
+
+```{r}
+## calculate average spend
+bbb <- mutate(bbb, avg_total = total / purch)
+```
+
+```{r fig.width = 7, fig.height = 4.67}
+visualize(
+  bbb,
+  xvar = "purch",
+  yvar = "avg_total",
+  type = "bar",
+  custom = FALSE
+)
+```
+
+What is the correlation between `purch` and `avg_total`?
+
+```{r fig.width = 7.54, fig.height = 7.54}
+result <- correlation(
+  bbb,
+  vars = c("last", "total", "purch", "avg_total")
+)
+summary(result)
+plot(result, n = 1000)
+```
+
+## Generate RFM index
+
+Use _Data > Transform > Create_ to generate the RFM index by _pasting_ `rec_iq`, `freq_iq`, and `mon_iq` together. 
+
+`rfm_iq = paste0(rec_iq, freq_iq, mon_iq)`
+
+```{r}
+## create new variable(s)
+bbb <- mutate(bbb, rfm_iq = paste0(rec_iq, freq_iq, mon_iq))
+```
+
+```{r fig.width = 10.5, fig.height = 4.67}
+visualize(
+  bbb,
+  xvar = "rfm_iq",
+  yvar = "buyer",
+  type = "bar",
+  labs = list(
+    y = "Proportion of buyer = 'yes'", 
+    x = "Independent RFM index (rfm_iq)"
+  ),
+  custom = TRUE
+) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+## Generate sequential quintiles
+
+There is no need to do anything with `recency` for a sequential quintiles approach because `rec_iq` is the same as `rec_sq`. However, to calculate `freq_sq` we first need to group the data by `rec_iq` before applying the `xtile` function. Subsequently, we need to group the data by `rec_iq` and `freq_sq` before applying the `xtile` function to calculate `mon_sq` 
+
+```{r}
+## calculate sequential frequency quintiles
+bbb <- group_by(bbb, rec_iq) %>%
+  mutate(freq_sq = xtile(purch, 5, rev = TRUE)) %>%
+  ungroup()
+
+## calculate sequential monetary quintiles
+bbb <- group_by(bbb, rec_iq, freq_sq) %>%
+  mutate(mon_sq = xtile(total, 5, rev = TRUE)) %>%
+  ungroup()
+```
+
+```{r fig.width = 7, fig.height = 4.67}
+visualize(
+  bbb,
+  xvar = "freq_sq",
+  yvar = "buyer",
+  type = "bar",
+  labs = list(
+    y = "Proportion of buyers = 'yes'", 
+    x = "Frequency quintiles (freq_sq)"
+  ),
+  custom = FALSE
+)
+```
+
+```{r fig.width = 7, fig.height = 4.67}
+visualize(
+  bbb,
+  xvar = "mon_sq",
+  yvar = "buyer",
+  type = "bar",
+  labs = list(
+    y = "Proportion of buyers = 'yes'", 
+    x = "Monetary value quintiles (mon_sq)"
+  ),
+  custom = FALSE
+)
+```
+
+## Generate Sequential RFM index
+
+Use _Data > Transform > Create_ to generate the RFM index by _pasting_ `rec_iq`, `freq_sq`, and `mon_sq` together. 
+
+`rfm_sq = paste0(rec_iq, freq_sq, mon_sq)`
+
+```{r}
+## create new variable(s)
+bbb <- mutate(bbb, rfm_sq = paste0(rec_iq, freq_sq, mon_sq))
+```
+
+```{r fig.width = 10.5, fig.height = 4.67}
+visualize(
+  bbb,
+  xvar = "rfm_sq",
+  yvar = "buyer",
+  type = "bar",
+  labs = list(
+    y = "Proportion of buyer = 'yes'", 
+    x = "Sequential RFM index (rfm_sq)"
+  ), 
+  custom = TRUE
+) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+## Calculate performance metrics without targeting
+
+## Response rate without RFM
+
+We can use _Data > Explore_ to generate summary statistics for the `buyer` variable in the sample
+
+```{r}
+result <- explore(
+  bbb,
+  vars = "buyer",
+  fun = c("n_obs", "mean")
+)
+summary(result, dec = 4)
+```
+
+Some basic R-code is needed to to calculate performance metrics for BBB when no targeting is used. We are now using R as a calculator.
+
+```{r}
+perc_mail <- 1
+nr_mail <- 500000 * perc_mail
+rep_rate <- mean(bbb$buyer == "yes")
+nr_resp <- nr_mail * rep_rate
+mail_cost <- .5 * nr_mail
+profit_nt <- (18 - 9 - 3) * nr_resp - mail_cost
+ROME_nt <- profit_nt / mail_cost
+```
+
+Without targeting BBB would mail all `r format_nr(nr_mail, dec = 0)` remaining customers (`r format_nr(perc_mail, perc = TRUE)`). The response rate is predicted to be `r format_nr(rep_rate, perc = TRUE)` or `r format_nr(nr_resp, dec = 0)` buyers. The expected profit is `r format_nr(profit_nt,"$", dec = 0)`. The mailing cost is estimated to be `r format_nr(mail_cost, "$", dec = 0)` with a ROME of `r format_nr(ROME_nt, perc = TRUE)`
+
+## Calculate performance metrics using independent RFM
+
+## Break-even (aggr)
+
+We can calcule the break-even response rate as follows:
+
+`.5 / (18 - 9 - 3) = `r (breakeven = .5 / (18 - 9 - 3))``
+
+The breakeven value is `r format_nr(breakeven, dec = 1, perc = TRUE)`.  All cells above the breakeven line in the plot below should be mailed.
+
+```{r fig.width = 10.5, fig.height = 4.67}
+visualize(
+  bbb,
+  xvar = "rfm_iq",
+  yvar = "buyer",
+  type = "bar",
+  labs = list(
+    y = "Proportion of buyer = 'yes'", 
+    x = "Independent RFM index (rfm_iq)"
+  ),
+  custom = TRUE
+) +
+  geom_hline(yintercept = 0.083) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+## Response rate using independent quintiles
+
+Create the `mailto_iq` variable for independent RFM making sure to select the `rfm_iq` variable so the estimates are generated for each cell.
+
+`mailto_iq = mean(buyer == "yes") > .083`
+
+```{r}
+## mail TRUE or FALSE
+bbb <- group_by(bbb, rfm_iq) %>%
+  mutate(mailto_iq = mean(buyer == "yes") > breakeven) %>%
+  ungroup()
+
+## also calculate response rate per group as an illustration
+bbb <- group_by(bbb, rfm_iq) %>%
+  mutate(rfm_iq_resp = mean(buyer == "yes")) %>%
+  ungroup()
+```
+
+```{r}
+result <- pivotr(
+  bbb,
+  cvars = "mailto_iq",
+  fun = "n_obs",
+  normalize = "total"
+)
+summary(result, dec = 2, perc = TRUE)
+```
+
+```{r}
+result <- explore(
+  bbb,
+  vars = "buyer",
+  byvar = "mailto_iq",
+  fun = c("n_obs", "mean")
+)
+summary(result, dec = 4)
+```
+
+## Calculate profits and ROME for Independent RFM
+
+Some basic R-code is again needed to to calculate performance metrics for BBB when targeting using independent RFM. The only difference with the calculations above is that we now also have calculate the percentage of customers that will be mailed rather than setting equal to 100%.
+
+```{r}
+perc_mail <- mean(bbb$mailto_iq)
+nr_mail <- 500000 * perc_mail
+dat <- filter(bbb, mailto_iq == TRUE)
+rep_rate <- mean(dat$buyer == "yes")
+nr_resp <- nr_mail * rep_rate
+mail_cost <- .5 * nr_mail
+profit_iq <- (18 - 9 - 3) * nr_resp - mail_cost
+ROME_iq <- profit_iq / mail_cost
+```
+
+Based on independent RFM the number of customers BBB should mail is `r format_nr(nr_mail, dec = 0)` (`r format_nr(perc_mail, perc = TRUE)`). The response rate for the selected customers is predicted to be `r format_nr(rep_rate, perc = TRUE)` or `r format_nr(nr_resp, dec = 0)` buyers. The expected profit is `r format_nr(profit_iq,"$", dec = 0)`. The mailing cost is estimated to be `r format_nr(mail_cost, "$", dec = 0)` with a ROME of `r format_nr(ROME_iq, perc = TRUE)`
+
+## Response rate using sequential quintiles
+
+Create the `mailto_sq` variable for sequential RFM making sure to select the `rfm_sq` variable so the estimates are generated for each cell.
+
+`mailto_sq = mean(buyer == "yes") > .083`
+
+```{r}
+## mail TRUE or FALSE
+bbb <- group_by(bbb, rfm_sq) %>%
+  mutate(mailto_sq = mean(buyer == "yes") > breakeven) %>%
+  ungroup()
+
+## also calculate response rate per group as an illustration
+bbb <- group_by(bbb, rfm_sq) %>%
+  mutate(rfm_sq_resp = mean(buyer == "yes")) %>%
+  ungroup()
+```
+
+```{r}
+result <- pivotr(bbb, cvars = "mailto_sq", fun = "n_obs", normalize = "total")
+summary(result, dec = 2, perc = TRUE)
+```
+
+```{r}
+result <- explore(
+  bbb,
+  vars = "buyer",
+  byvar = "mailto_sq",
+  fun = c("n_obs", "mean")
+)
+summary(result, dec = 4)
+```
+
+## Calculate profits and ROME using Sequential RFM
+
+```{r}
+perc_mail <- mean(bbb$mailto_sq)
+nr_mail <- 500000 * perc_mail
+dat <- filter(bbb, mailto_sq == TRUE)
+rep_rate <- mean(dat$buyer == "yes")
+nr_resp <- nr_mail * rep_rate
+mail_cost <- .5 * nr_mail
+profit_sq <- (18 - 9 - 3) * nr_resp - mail_cost
+ROME_sq <- profit_sq / mail_cost
+```
+
+Based on sequential RFM the number of customers BBB should mail is `r format_nr(nr_mail, dec = 0)` (`r format_nr(perc_mail, perc = TRUE)`). The response rate for the selected customers is predicted to be `r format_nr(rep_rate, perc = TRUE)` or `r format_nr(nr_resp, dec = 0)` buyers. The expected profit is `r format_nr(profit_sq,"$", dec = 0)`. The mailing cost is estimated to be `r format_nr(mail_cost, "$", dec = 0)` with a ROME of `r format_nr(ROME_sq, perc = TRUE)`.
+
+Compare this to the main results from independent RFM. The expected profit is `r format_nr(profit_iq,"$", dec = 0)`. The mailing cost is estimated to be `r format_nr(mail_cost, "$", dec = 0)` with a ROME of `r format_nr(ROME_iq, perc = TRUE)`
+
+## Extra: Intuitive groupings
+
+Generate the RFM variables based on intuitive groupings.
+
+```{r}
+## create recency groups using case_when
+bbb <- mutate(
+  bbb,
+  rec_ig = case_when(
+    last <= 6 ~ 1, 
+    last > 6 & last <= 12 ~ 2,
+    last > 12 & last <= 18 ~ 3,
+    last > 18 & last <= 24 ~ 4, 
+    TRUE ~ 5
+  )
+)
+
+## create frequency groups
+bbb <- mutate(bbb, freq_ig = ifelse(purch == 1, 2, 1))
+
+## create monetary groups
+bbb <- mutate(bbb, mon_ig = ifelse(total < median(total), 2, 1))
+
+## change all _iq variables to type {integer} using _Data > Transform > Change type_
+bbb <- mutate_at(
+  bbb,
+  .vars = vars(rec_ig, freq_ig, mon_ig),
+  .funs = as_integer
+)
+
+## create new variable(s)
+bbb <- mutate(bbb, rfm_ig = paste0(rec_ig, freq_ig, mon_ig))
+```
+
+Create the `mailto_ig` variable for RFM based on intuitive groupings and make sure to select the `rfm_ig` variable so the estimates are generated for each cell.
+
+```{r}
+## mail TRUE or FALSE
+bbb <- group_by(bbb, rfm_ig) %>%
+  mutate(mailto_ig = mean(buyer == "yes") > breakeven) %>%
+  ungroup()
+```
+
+```{r}
+perc_mail <- mean(bbb$mailto_ig)
+nr_mail <- 500000 * perc_mail
+dat <- filter(bbb, mailto_ig == TRUE)
+rep_rate <- mean(dat$buyer == "yes")
+nr_resp <- nr_mail * rep_rate
+mail_cost <- .5 * nr_mail
+profit_ig <- (18 - 9 - 3) * nr_resp - mail_cost
+ROME_ig <- profit_ig / mail_cost
+```
+
+Based on intuitively grouped RFM the number of customers BBB should mail is `r format_nr(nr_mail, dec = 0)` (`r format_nr(perc_mail, perc = TRUE)`). The response rate for the selected customers is predicted to be `r format_nr(rep_rate, perc = TRUE)` or `r format_nr(nr_resp, dec = 0)` buyers. The expected profit is `r format_nr(profit_ig,"$", dec = 0)`. The mailing cost is estimated to be `r format_nr(mail_cost, "$", dec = 0)` with a ROME of `r format_nr(ROME_ig, perc = TRUE)`.
+
+## Extra: Graphing Profit and ROME across methods
+
+```{r}
+## make a tibble (data.frame) with results
+dat <- tibble::tibble(
+  name = c("No targeting", "Indep. RFM", "Sequen. RFM", "Intuit. RFM"),
+  Profit = c(profit_nt, profit_iq, profit_sq, profit_ig),
+  ROME = c(ROME_nt, ROME_iq, ROME_sq, ROME_ig)
+) %>%
+  mutate(name = factor(name, levels = name))
+```
+
+```{r fig.width = 5, fig.height = 4}
+## plot campaign profit
+visualize(
+  dat, 
+  xvar = "name", 
+  yvar = "Profit", 
+  type = "bar", 
+  labs = list(title = "Campaign profit", x = ""),
+  custom = TRUE
+) +
+  geom_text(aes(label = format_nr(Profit, dec = 0)), vjust = 2)
+```
+
+```{r fig.width = 5, fig.height = 4}
+## plot ROME
+visualize(
+  dat, 
+  xvar = "name", 
+  yvar = "ROME", 
+  type = "bar", 
+  labs = list(title = "Return on Marketing Expenditures (ROME)", x = ""),
+  custom = TRUE
+) +
+  geom_text(aes(label = format_nr(ROME, dec = 2)), vjust = 2)
+```
+
+## Extra: Refining the break even rule with prediction precision based on Independent quintiles
+
+We want to establish that the estimated response rates per RFM cell are significantly larger than the break-even response rate. Lets start with a test of the proportion of buyers in RFM group 111.
+
+```{r fig.width = 7, fig.height = 4.31}
+result <- single_prop(
+  bbb,
+  var = "buyer",
+  lev = "yes",
+  comp_value = 0.083,
+  alternative = "greater",
+  data_filter = "rfm_iq == '111'"
+)
+summary(result)
+```
+
+The results show that we can reject $H_0$ in favor of the alternative hypothesis that the proportion of buyers in this group in the population will be above the break-even response rate.
+
+Recall that the "worst" cell we would still target was index 253 for `rfm_iq`. This group had a sample response rate of 0.085. The test below shows that we cannot reject $H_0$ for this group. 
+
+```{r fig.width = 7, fig.height = 4.31}
+result <- single_prop(
+  bbb,
+  var = "buyer",
+  lev = "yes",
+  comp_value = 0.083,
+  alternative = "greater",
+  data_filter = "rfm_iq == '253'"
+)
+summary(result)
+```
+
+We can generate the required inputs to calculate the lower-bound on the response rate for each cell using _Data > Explore_ as follows:
+
+```{r}
+result <- explore(
+  bbb,
+  vars = "buyer",
+  byvar = "rfm_iq",
+  fun = c("n_obs", "prop", "seprop"),
+  nr = 95
+)
+dtab(result, dec = 4) %>% render()
+bbb_lbiq <- result$tab
+register("bbb_lbiq")
+```
+
+Then we can use _Data > Transform_ to calculate the lower-bound on the response rate
+
+```{r}
+## create lower-bound
+bbb_lbiq <- mutate(bbb_lbiq, prop_lb = prop - 1.64 * seprop)
+```
+
+The figure below shows instances where the lower-bound of the confidence interval around the response rate for a cell is below the break-even cut-off point although the sample response rate is above the cut-off point.
+
+```{r fig.width = 10.5, fig.height = 4.67}
+visualize(
+  bbb_lbiq,
+  xvar = "rfm_iq",
+  yvar = c("prop", "prop_lb"),
+  comby = TRUE,
+  type = "line",
+  labs = list(
+    y = "Proportion of buyer = 'yes'",
+    x = "Independent RFM index (rfm_iq)",
+    color = ""
+  ),
+  custom = TRUE
+) +
+  geom_hline(yintercept = 0.083) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+Create the `mailto_lbiq` variable for independent RFM **adjusting for estimation accuracy** making sure to select the `rfm_iq` variable so the estimates are generated for each cell.
+
+    mailto_lbiq = (mean(buyer == "yes") - 1.64 * seprop(buyer == "yes")) > .083
+
+```{r}
+## mail TRUE or FALSE
+bbb <- group_by(bbb, rfm_iq) %>%
+  mutate(mailto_lbiq = (mean(buyer == "yes") - 1.64 * seprop(buyer == "yes")) > 0.083) %>%
+  ungroup()
+```
+
+The rest of the calculations are the same as before.
+
+```{r}
+perc_mail <- mean(bbb$mailto_lbiq)
+nr_mail <- 500000 * perc_mail
+dat <- filter(bbb, mailto_lbiq == TRUE)
+rep_rate <- mean(dat$buyer == "yes")
+nr_resp <- nr_mail * rep_rate
+mail_cost <- .5 * nr_mail
+profit_lbiq <- (18 - 9 - 3) * nr_resp - mail_cost
+ROME_lbiq <- profit_lbiq / mail_cost
+```
+
+Based on independent RFM, after adjustment for prediction precision, the number of customers BBB should mail is `r format_nr(nr_mail, dec = 0)` (`r format_nr(perc_mail, perc = TRUE)`). The response rate for the selected customers is predicted to be `r format_nr(rep_rate, perc = TRUE)` or `r format_nr(nr_resp, dec = 0)` buyers. The expected profit is `r format_nr(profit_lbiq,"$", dec = 0)`. The mailing cost is estimated to be `r format_nr(mail_cost, "$", dec = 0)` with a ROME of `r format_nr(ROME_lbiq, perc = TRUE)`.
+
+## Extra: Refining the break even rule with prediction precision based on Sequential quintiles
+
+We want to establish that the estimated response rates per RFM cell are significantly larger than the break-even response rate. Lets start with a test of the proportion of buyers in RFM group 111.
+
+```{r}
+result <- single_prop(
+  bbb,
+  var = "buyer",
+  lev = "yes",
+  comp_value = 0.083,
+  alternative = "greater",
+  data_filter = "rfm_sq == '111'"
+)
+summary(result)
+```
+
+The results show that we can reject $H_0$ in favor of the alternative hypothesis that the proportion of buyers in this group in the population will be above the break-even response rate.
+
+Recall that the "worst" groups we would still send to was index 323 for `rfm_sq`. This group had a sample response rate of 0.085. The test below shows that we cannot reject $H_0$ for this group. 
+
+```{r}
+result <- single_prop(
+  bbb,
+  var = "buyer",
+  lev = "yes",
+  comp_value = 0.083,
+  alternative = "greater",
+  data_filter = "rfm_sq == '323'"
+)
+summary(result)
+```
+
+We can generate the required inputs to calculate the lower-bound on the response rate for each cell using _Data > Explore_ as follows:
+
+```{r}
+result <- explore(
+  bbb,
+  vars = "buyer",
+  byvar = "rfm_sq",
+  fun = c("n_obs", "prop", "seprop"),
+  nr = 95
+)
+dtab(result, dec = 4) %>% render()
+bbb_lbsq <- result$tab
+register("bbb_lbsq")
+```
+
+Then we can use _Data > Transform_ to calculate the lower-bound on the response rate
+
+```{r}
+## create lower-bound
+bbb_lbsq <- mutate(bbb_lbsq, prop_lb = prop - 1.64 * seprop)
+```
+
+The figure below shows instances where the lower-bound of the confidence interval around the response rate for a cell is below the break-even cut-off point although the sample response rate is above the cut-off point.
+
+```{r fig.width = 10.5, fig.height = 4.67}
+visualize(
+  bbb_lbsq,
+  xvar = "rfm_sq",
+  yvar = c("prop", "prop_lb"),
+  comby = TRUE,
+  type = "line",
+  labs = list(
+    y = "Proportion of buyer = 'yes'",
+    x = "Sequential RFM index (rfm_sq)",
+    color = ""
+  ),
+  custom = TRUE
+) +
+  geom_hline(yintercept = 0.083) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+Create the `mailto_lbsq` variable for sequential RFM **adjusting for estimation accuracy** making sure to select the `rfm_sq` variable so the estimates are generated for each cell.
+
+    mailto_lbsq = (mean(buyer == "yes") - 1.64 * seprop(buyer == "yes")) > .083
+
+```{r}
+## mail TRUE or FALSE
+bbb <- group_by(bbb, rfm_sq) %>%
+  mutate(mailto_lbsq = (mean(buyer == "yes") - 1.64 * seprop(buyer == "yes")) > 0.083) %>%
+  ungroup()
+```
+
+The rest of the calculations are the same as before.
+
+```{r}
+perc_mail <- mean(bbb$mailto_lbsq)
+nr_mail <- 500000 * perc_mail
+dat <- filter(bbb, mailto_lbsq == TRUE)
+rep_rate <- mean(dat$buyer == "yes")
+nr_resp <- nr_mail * rep_rate
+mail_cost_lbsq <- .5 * nr_mail
+profit_lbsq <- (18 - 9 - 3) * nr_resp - mail_cost_lbsq
+ROME_lbsq <- profit_lbsq / mail_cost_lbsq
+```
+
+Based on sequential RFM, after adjustment for prediction precision, the number of customers BBB should mail is `r format_nr(nr_mail, dec = 0)` (`r format_nr(perc_mail, perc = TRUE)`). The response rate for the selected customers is predicted to be `r format_nr(rep_rate, perc = TRUE)` or `r format_nr(nr_resp, dec = 0)` buyers. The expected profit is `r format_nr(profit_lbsq,"$", dec = 0)`. The mailing cost is estimated to be `r format_nr(mail_cost_lbsq, "$", dec = 0)` with a ROME of `r format_nr(ROME_lbsq, perc = TRUE)`.
+
+
+Updating profit and ROME plots:
+
+```{r}
+## make a tibble (data.frame) with results
+bbb_results <- tibble::tibble(
+  name = c("No targeting", "Indep. RFM", "Sequen. RFM", "Intuit. RFM", "Indep. lb RFM", "Seq. lb RFM"),
+  Profit = c(profit_nt, profit_iq, profit_sq, profit_ig, profit_lbiq, profit_lbsq),
+  ROME = c(ROME_nt, ROME_iq, ROME_sq, ROME_ig, ROME_lbiq, ROME_lbsq)
+) %>%
+  mutate(name = factor(name, levels = name))
+register("bbb_results")
+```
+
+```{r fig.width = 6, fig.height = 4}
+## plot campaign profit
+visualize(
+  bbb_results,
+  xvar = "name",
+  yvar = "Profit",
+  type = "bar",
+  labs = list(title = "Campaign profit", x = ""),
+  custom = TRUE
+) +
+  geom_text(aes(label = format_nr(Profit, dec = 0)), vjust = 2)
+```
+
+```{r fig.width = 6, fig.height = 4}
+## plot ROME
+visualize(
+  bbb_results,
+  xvar = "name",
+  yvar = "ROME",
+  type = "bar",
+  labs = list(title = "Return on Marketing Expenditures (ROME)", x = ""),
+  custom = TRUE
+) +
+  geom_text(aes(label = format_nr(ROME, dec = 2)), vjust = 2)
+```
+ 
+
