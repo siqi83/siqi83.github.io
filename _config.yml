@@ -1,10 +1,10 @@
 # Site
 title:              Siqi (Stella) Hu
-bio:                '?'
+bio:                '一点点有趣的人'
 description:        "Siqi Hu's blog"
 reading_time:       true
 words_per_minute:   1000
-logo:               'assets/img/logo.png'
+logo:               'assets/img/IMG_4346.JPG'
 background:         'assets/img/placeholder-big.jpg'
 tiled_bg:           false   # Set this true if you want to tile your background image, otherwise it will be covered
 locale:             en_US
@@ -40,10 +40,10 @@ disqus_shortname:   taylantatli
 email: sihu@ucsd.edu
 #twitter:            username
 #facebook:           username
-github-url:         siqi83
 #stackoverflow:     123456/username   from a "http://stackoverflow.com/users/123456/username" link
 linkedin:          siqihu
 #xing:              username
+github-url:         siqi83
 instagram:          sss_kkk83
 #lastfm:            username
 #tumblr:            username
